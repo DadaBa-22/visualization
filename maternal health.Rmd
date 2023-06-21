@@ -1,0 +1,500 @@
+---
+title: "Maternal Risk Project"
+author: "FREDRICK SARFO"
+date: "2023-06-03"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You 
+
+```{r}
+
+```
+## PREDICTING MATERNAL HEALTH RISK
+Maternal:relating to a mother, especially during pregnancy or shortly after childbirth. Maternal health refers to the health of women during pregnancy, childbirth and the postnatal period. 
+
+Each stage should be a positive experience, ensuring women and their babies reach their full potential for health and well-being. 
+
+Although important progress has been made in the last two decades, about 287 000 women died during and following pregnancy and childbirth in 2020. This number is unacceptably high.
+
+The most common direct causes of maternal injury and death are excessive blood loss, infection, high blood pressure, unsafe abortion, and obstructed labour, as well as indirect causes such as anemia, malaria, and heart disease. 
+
+Most maternal deaths are preventable with timely management by a skilled health professional working in a supportive environment. 
+
+Ending preventable maternal death must remain at the top of the global agenda. At the same time, simply surviving pregnancy and childbirth can never be the marker of successful maternal health care. It is critical to expand efforts reducing maternal injury and disability to promote health and well-being.
+
+Every pregnancy and birth is unique. Addressing inequalities that affect health outcomes, especially sexual and reproductive health and rights and gender, is fundamental to ensuring all women have access to respectful and high-quality maternity care.
+For this reason it is important to predict the maternal risk of every lady or woman
+so that the require preventive measures will be put in place. 
+
+This project will use these variables
+Age: Age in years when a woman is pregnant.
+• SystolicBP: Upper value of Blood Pressure in mmHg, another significant attribute during pregnancy.
+• DiastolicBP: Lower value of Blood Pressure in mmHg, another significant attribute during pregnancy.
+• BS: Blood glucose levels is in terms of a molar concentration, mmol/L.
+• HeartRate: A normal resting heart rate in beats per minute.
+• Risk Level: Predicted Risk Intensity Level during pregnancy considering the previous attribute.
+
+ ### IMPORTING THE THE REQUIRE PACKAGES
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+```
+### IMPORTING THE DATA INTO R MARKDOWN
+```{r}
+maternal_risk <-read_csv("C:/Users/DaDaBa/Downloads/Maternal_Risk.csv")
+maternal_risk
+```
+## Verify to see if our data imported correctly
+
+```{r}
+colnames(maternal_risk)
+```
+
+
+```{r}
+str(maternal_risk)
+```
+
+```{r}
+head(maternal_risk, n=10)
+```
+
+```{r}
+tail(maternal_risk)
+```
+
+
+```{r}
+nrow(maternal_risk)
+ncol(maternal_risk)
+```
+```{r}
+sum(is.na(maternal_risk))
+```
+
+```{r}
+## Now we convert risk level into a factor since is a categorical variable 
+Risklevel <- as.factor(maternal_risk$RiskLevel)
+head(risklevel)
+```
+
+### EXPLORATORY DATA ANALYSIS (EDA)
+
+```{r}
+summary(maternal_risk %>% select(where(is.numeric)))
+```
+
+
+```{r}
+table(Risklevel)
+addmargins(table(Risklevel))
+```
+```{r}
+hist(maternal_risk$Age, col = "blue", main = "AGE DISTRIBUTION")
+```
+
+
+```{r}
+hist(maternal_risk$SystolicBP, col = "cornflowerblue", main = "DISTRIBUTION OF SYSTOLIC BLOOD PRESSURE")
+```
+```{r}
+hist(maternal_risk$HeartRate, col = "cornflowerblue", main = "DISTRIBUTION OF HEART RATE")
+```
+
+
+```{r}
+hist(maternal_risk$DiastolicBP, col = "cornflowerblue", main = "DiISTRIBUTION DIASTOLIC BLOOD PRESSURE")
+```
+All the independent variable does not follows any particular distribution. this has no implication on our model since logistics regression does not follow in assumption.
+
+```{r}
+ggplot(maternal_risk, aes(x = BS, y = SystolicBP)) + 
+  geom_point(col = "blue")+ labs(title = "SCATTER PLOT OF SYSTOLIC AND BLOOD GLUCOSE")
+```
+The scatter plot shows that body temperature and systolic blood pressure are not highly correlated. this assumes that relation between the two variables is not linear. this has no effect on our model since logistics regression does not assume linearity.
+```{r}
+ggplot(maternal_risk, aes(x = DiastolicBP, y =  SystolicBP)) + 
+  geom_point(col = "blue")+labs(title = "SCATTER PLOT OF DIASTOLIC BP AND SYSTOLIC BP")
+```
+The plot suggest the systolic blood pressure and diastolic blood pressure are positively correlated. This implies that systolic blood pressure and diastolic blood are linearly related. This also signify that one depend on the other, in that case an increase on can cause a change in the other.
+
+```{r}
+ggplot(maternal_risk, aes(x = Age, y = BodyTemp)) + 
+  geom_point(col = "blue")+ labs(title = "SCATTER PLOT OF AGE AND BODY TEMP")
+```
+The plot does not show any sign of linearity which implies that ones age can not determine his or her body temperature. An increase in age does not increase or decrease body temperature.
+
+```{r}
+ggplot(maternal_risk, aes(x = BodyTemp, y = SystolicBP)) + 
+  geom_point(col = "blue")+labs(title = "SCATTER PLOT OF BODY TEMP. AND SYSTOLIC BP")
+```
+
+
+```{r}
+ggplot(maternal_risk, aes(x = Age, y = SystolicBP)) + 
+  geom_point(col = "blue")+ labs(title = "SCATTER PLOT OF AGE AND SYSTOLIC BP")
+```
+
+
+```{r}
+ggplot(maternal_risk, aes(x = RiskLevel)) + 
+  geom_bar(col = "blue", fill = "indianred")+
+  labs(title = "BAR CHART OF RISK LEVEL")
+```
+
+
+```{r}
+library(corrplot)
+correlation <- cor(maternal_risk%>% select(where(is.numeric)))
+corrplot(correlation, method = "color", order = "hclust", addCoef.col = "black")
+```
+
+
+```{r}
+pairs(correlation, cex = 1, main = "CORELATION PLOT OF THE INDEPENDENT VARIABLES")
+```
+
+### CREATING THE CONFUSION MATRIX
+```{r}
+# Make reusable Confusion Matrix function
+my_confusion_matrix <- function(cf_table) {
+  true_positive <- cf_table[4]
+  true_negative <- cf_table[1]
+  false_positive <- cf_table[2]
+  false_negative <- cf_table[3]
+  accuracy <- (true_positive + true_negative) / (true_positive + true_negative + false_positive + false_negative)
+  sensitivity_recall <- true_positive / (true_positive + false_negative) 
+  specificity_selectivity <- true_negative / (true_negative + false_positive)
+  precision <- true_positive / (true_positive + false_positive) 
+  neg_pred_value <- true_negative/(true_negative + false_negative)
+  print(cf_table)
+  my_list <- list(sprintf("%1.0f = True Positive (TP), Hit", true_positive),
+                  sprintf("%1.0f = True Negative (TN), Rejection", true_negative),
+                  sprintf("%1.0f = False Positive (FP), Type 1 Error", false_positive),
+                  sprintf("%1.0f = False Negative (FN), Type 2 Error", false_negative),
+                  sprintf("%1.4f = Accuracy (TP+TN/(TP+TN+FP+FN))", accuracy), 
+                  sprintf("%1.4f = Sensitivity, Recall, Hit Rate, True Positive Rate (How many positives did the model get right? TP/(TP+FN))", sensitivity_recall),
+                  sprintf("%1.4f = Specificity, Selectivity, True Negative Rate (How many negatives did the model get right? TN/(TN+FP))", specificity_selectivity),                   
+                  sprintf("%1.4f = Precision, Positive Predictive Value (How good are the model's positive predictions? TP/(TP+FP))", precision),
+                  sprintf("%1.4f = Negative Predictive Value (How good are the model's negative predictions? TN/(TN+FN)", neg_pred_value)
+  )
+  return(my_list)
+}
+```
+
+
+```{r}
+library(caret)
+library(jtools)
+library(class)
+library(DescTools)
+library(ResourceSelection)
+library(ROCR)
+library(pROC)
+```
+### SPLITTING DATA INTO TRAINING AND TESTING DATAS
+
+```{r}
+set.seed(77)
+partition <- caret::createDataPartition(y = maternal_risk$RiskLevel, p = 0.75, list = F)
+train_data <- maternal_risk[partition,]
+test_data <- maternal_risk[-partition,]
+```
+
+
+```{r}
+print(nrow(test_data)/(nrow(test_data)+nrow(train_data)))
+```
+```{r}
+nrow(train_data)/(nrow(test_data)+nrow(train_data))
+```
+
+
+```{r}
+nrow(train_data)
+nrow(test_data)
+```
+### BUILDING THE LOGISTICS MODEL
+
+```{r}
+Null <-glm(as.factor(RiskLevel) ~ 1, family = binomial(link = logit), data = train_data)
+Null
+```
+
+
+```{r}
+log_reg_model <- glm(as.factor(RiskLevel) ~ BS + BodyTemp + SystolicBP + DiastolicBP + Age + HeartRate, family = binomial(link = logit), data = train_data)
+log_reg_model
+```
+The generalized linear model (GLM) provided aims to predict the "RiskLevel" based on the variables "BS," "BodyTemp," "SystolicBP," "DiastolicBP," "Age," and "HeartRate." The model assumes a binomial distribution for the response variable and uses a logit link function to model the relationship between the predictors and the log-odds of the response.
+
+**Interpreting the coefficients**
+
+**Intercept**: The intercept term represents the estimated log-odds of the response variable when all the predictor variables are zero. In this case, the intercept is 117.687157. However, it's important to note that the interpretation of the intercept may not be meaningful without further context.
+
+**BS**: For a one-unit increase in "BS" (assuming it is a continuous variable), the log-odds of the response variable decrease by approximately 1.23 units, holding other predictors constant.
+
+**BodyTemp**: A one-unit increase in "BodyTemp" is associated with a decrease of around 0.97 units in the log-odds of the response variable, keeping other predictors constant.
+
+**SystolicBP**: An increase of one unit in "SystolicBP" corresponds to a decrease of about 0.06 units in the log-odds of the response variable, assuming other predictors remain constant.
+
+**DiastolicBP**: Holding other predictors constant, a one-unit increase in "DiastolicBP" leads to a decrease of approximately 0.04 units in the log-odds of the response variable.
+
+**Age**: For each additional year of age (assuming "Age" is a continuous variable), the log-odds of the response variable increase by about 0.009 units, assuming other predictors remain constant.
+
+**HeartRate**: A one-unit increase in "HeartRate" is associated with a decrease of approximately 0.03 units in the log-odds of the response variable, holding other predictors constant.
+
+**Degrees of Freedom**: The model has 606 degrees of freedom in total, indicating the number of independent observations in the data used for model estimation. The residual model has 600 degrees of freedom, representing the number of observations minus the number of estimated coefficients.
+
+**Deviance**: The null deviance, which is 821.1, measures the model's fit when only the intercept is considered. The residual deviance, which is 317.7, reflects the model's fit after including the predictor variables. A lower residual deviance indicates a better fit of the model to the data.
+
+**AIC**: The AIC (Akaike Information Criterion) is a measure of the model's quality, balancing the trade-off between goodness of fit and model complexity. In this case, the AIC is 331.7, and lower values indicate a better fit while considering the complexity of the model
+
+
+```{r}
+summary(log_reg_model)
+```
+### ITERPRETATION OF THE MODEL
+
+**Coefficients** 
+**Intercept**: The intercept term (117.687157) represents the estimated log-odds of the response variable when all the predictor variables are zero. It is statistically significant (p < 0.001), suggesting that there is a significant baseline risk level even in the absence of the predictors.
+
+**BS**: For each unit increase in "BS" (Blood Sugar), the log-odds of the response variable decrease by approximately 1.23. The coefficient is statistically significant (p < 0.001), indicating that higher blood sugar levels are associated with a higher risk level.
+
+**BodyTemp**: A one-unit increase in "BodyTemp" is associated with a decrease of about 0.97 units in the log-odds of the response variable. The coefficient is statistically significant (p < 0.001), suggesting that higher body temperatures are related to a lower risk level.
+
+**SystolicBP**: An increase of one unit in "SystolicBP" corresponds to a decrease of approximately 0.06 units in the log-odds of the response variable. The coefficient is statistically significant (p = 0.000495), indicating that higher systolic blood pressure is associated with a lower risk level.
+
+**DiastolicBP**: The coefficient for "DiastolicBP" suggests that a one-unit increase in diastolic blood pressure leads to a decrease of about 0.04 units in the log-odds of the response variable. However, it is not statistically significant at the conventional significance level of 0.05 (p = 0.09082).
+
+**Age**: The coefficient for "Age" (0.009223) indicates that for each additional year, the log-odds of the response variable increase by approximately 0.009. However, the coefficient is not statistically significant (p = 0.517047).
+
+**HeartRate**: The coefficient for "HeartRate" (-0.030942) suggests that a one-unit increase in heart rate is associated with a decrease of approximately 0.031 units in the log-odds of the response variable. However, it is not statistically significant (p = 0.111447).
+
+
+**Standard Error** is a measure of the uncertainty or variability associated with the estimated coefficients. Smaller standard errors indicate more precise estimates.
+
+The standard errors for each coefficient estimate are as follows:
+
+Intercept: 13.500727
+BS (Blood Sugar): 0.159756
+BodyTemp: 0.122732
+SystolicBP: 0.016949
+Age: 0.014235
+HeartRate: 0.019440
+Standard error can be used to compute confidence intervals for the coefficient estimates. Generally, a 95% confidence interval is calculated as the estimate plus or minus two times the standard error.
+
+Additionally, the standard errors are used to calculate the z-values and p-values associated with each coefficient estimate. These values indicate the statistical significance of the coefficient. Smaller p-values suggest stronger evidence against the null hypothesis of no relationship between the predictor and the response variable.
+Looking at the model standard errors associated with each co-efficient and 
+
+It's important to note that the standard error interpretation should be combined with the coefficient estimates and their corresponding p-values to make meaningful conclusions about the statistical significance and precision of the estimated coefficients.
+
+Overall, smaller standard errors indicate more precise estimates, while larger standard errors suggest greater uncertainty in the coefficient estimates
+
+**Model Fit**:
+
+The null deviance (821.07) represents the model's fit when only the intercept is included, while the residual deviance (317.66) represents the model's fit after including the predictor variables. The residual deviance is significantly lower than the null deviance, indicating that the model with predictors provides a significantly better fit to the data.
+
+The AIC (Akaike Information Criterion) value of 331.66 suggests that this model provides a reasonable balance between goodness of fit and model complexity. Lower AIC values indicate a better fit, considering the trade-off with model complexity.
+
+Overall, this interpretation gives you insights into the relationship between the predictors and the risk level outcome, their statistical significance, and the goodness of fit of the model.
+
+```{r}
+MODEL_2 <- glm(as.factor(RiskLevel) ~ BS + BodyTemp + SystolicBP + Age + HeartRate, family = binomial(link = logit), data = train_data)
+MODEL_2
+```
+### INTERPRETATION OF MODEL TWO
+**Intercept**: The intercept term (114.87157) represents the estimated log-odds of the response variable when all the predictor variables are zero. This value indicates the baseline risk level in the absence of the predictors.
+
+**BS**: For each unit increase in "BS" (Blood Sugar), the log-odds of the response variable decrease by approximately 1.22. This coefficient suggests that higher blood sugar levels are associated with a higher risk level.
+
+**BodyTemp**: A one-unit increase in "BodyTemp" is associated with a decrease of about 0.94 units in the log-odds of the response variable. This coefficient suggests that higher body temperatures are related to a lower risk level.
+
+**SystolicBP**: An increase of one unit in "SystolicBP" corresponds to a decrease of approximately 0.08 units in the log-odds of the response variable. This coefficient suggests that higher systolic blood pressure is associated with a lower risk level.
+
+**Age**: The coefficient for "Age" (0.00762) indicates that for each additional year, the log-odds of the response variable increase by approximately 0.00762. This coefficient suggests a slight positive association between age and the risk level, although it appears to be relatively small.
+
+**HeartRate**: The coefficient for "HeartRate" (-0.03283) suggests that a one-unit increase in heart rate is associated with a decrease of approximately 0.03283 units in the log-odds of the response variable. This coefficient indicates that higher heart rates are associated with a lower risk level.
+
+**Degrees of Freedom**:
+
+The model has 606 degrees of freedom in total, representing the number of independent observations used for model estimation.
+The residual model has 601 degrees of freedom, indicating the number of observations minus the number of estimated coefficients.
+Deviance and AIC:
+
+The null deviance (821.1) represents the model's fit when only the intercept is included, while the residual deviance (320.5) represents the model's fit after including the predictor variables. The decrease in deviance indicates that the model with predictors provides a better fit to the data compared to the null model.
+The AIC value of 332.5 suggests that this model provides a reasonable balance between goodness of fit and model complexity. Lower AIC values indicate a better fit, considering the trade-off with model complexity.
+Keep in mind that this interpretation is based solely on the provided model output, and further analysis, validation, and contextual understanding are necessary to draw definitive conclusions.
+
+```{r}
+summary(MODEL_2)
+```
+
+
+the statistical significance (p-values) of Age and HeartRate coefficients has changed in this updated model compared to the previous one. Age (p = 0.2524) and HeartRate (p = 0.0829) are not statistically significant at the conventional level of 0.05
+
+## COMPARING THE TWO MODEL
+The coefficients and statistical significance of the variables may have slightly changed between the two models, and the overall set of variables. Therefore, it would be prudent to consider the goodness-of-fit measures, such as the AIC, to compare the models and select the one that has a lower AIC value, indicating a better fit to the data.
+Comparing the two model the AIC of the first model is lesser than the second one which an indication that the first model which is full model with AIC 430.3 is the best model for predicting the maternal health risk.This shows that taking diastolic blood pressure from the model will not have any significant improvement on the model
+
+
+```{r}
+plot_summs(log_reg_model, MODEL_2)
+```
+The plot of the coefficients of the two model. the plot shows no significant change the coefficient of the two models.this shows that taking diastolic blood pressure from the model will not have any significant improvement on the model.
+
+### MODEL EVALUATION
+
+```{r}
+par(pty = "s")
+roc(train_data$RiskLevel, log_reg_model$fitted.values, plot = TRUE, legacy.axes = TRUE, percent = T, xlab = "False Positive Percentage", ylab = "True Positive Percentage", print.auc = T, col ="cornflowerblue")
+```
+```{r}
+ROC<-roc(train_data$RiskLevel, log_reg_model$fitted.values, legacy.axes = T)
+ROC.D <- data.frame(TPP = ROC$specificities*100, FPP = (1-ROC$specificities)*100, Thresholds = ROC$thresholds)
+ROC.D
+```
+```{r}
+tail(ROC.D)
+```
+
+```{r}
+Cstat(log_reg_model)
+```
+The C-statistic, also known as the concordance statistic or the area under the receiver operating characteristic curve (AUC-ROC), is a measure of the discriminatory power or predictive accuracy of a logistic regression model. It ranges from 0 to 1, with a higher value indicating better discrimination or predictive ability.
+
+In this logistic regression model, the C-statistic is 0.9597027. This suggests that the model has a strong discriminatory power and is highly accurate in distinguishing between high-risk and low-risk individuals. The closer the C-statistic is to 1, the better the model's ability to correctly classify individuals into their respective risk levels.
+
+With a C-statistic of 0.9597027, it indicates that the logistic regression model is performing very well in terms of discrimination. It implies that the model has a high probability of correctly ranking the risk levels of individuals based on the predictor variables included in this model. 
+
+```{r}
+HL <- hoslem.test(x = log_reg_model$y, y = fitted(log_reg_model), g = 6)
+HL
+summary(HL)
+```
+
+
+```{r}
+plot(HL$observed[,"y1"], HL$expected[,"yhat1"], xlab = "OBSERVE VALUES", ylab = "EXPECTED VALUES", col = "blue")
+```
+
+
+```{r}
+predict_train <- predict(log_reg_model, newdata = train_data, positive = "highrisk")
+summary(predict_train)
+```
+
+
+```{r}
+train_data$predict_train <- predict_train
+```
+
+
+```{r}
+head(train_data)
+```
+
+
+```{r}
+matrix_table <- table(predict_train > 0.5, train_data$RiskLevel)
+matrix_table
+```
+True Positive (TP): 334 - This represents the number of positive instances (high risk) correctly identified by the model.
+
+True Negative (TN): 216 - This represents the number of negative instances (low risk) correctly identified by the model.
+
+False Positive (FP): 32 - This represents the number of negative instances (low risk) incorrectly classified as positive (high risk) by the model (Type 1 Error).
+
+False Negative (FN): 25 - This represents the number of positive instances (high risk) incorrectly classified as negative (low risk) by the model (Type 2 Error).
+
+Accuracy: 0.9061 - This metric indicates the overall correctness of the model's predictions, calculated as (TP + TN) divided by the total number of instances (TP + TN + FP + FN).
+
+Sensitivity/Recall/Hit Rate/True Positive Rate: 0.9304 - This metric measures the model's ability to correctly identify positive instances (high risk), calculated as TP divided by the sum of TP and FN. It represents the proportion of actual positive instances that were correctly identified by the model.
+
+Specificity/Selectivity/True Negative Rate: 0.8710 - This metric measures the model's ability to correctly identify negative instances (low risk), calculated as TN divided by the sum of TN and FP. It represents the proportion of actual negative instances that were correctly identified by the model.
+
+Precision/Positive Predictive Value: 0.9126 - This metric measures the proportion of positive predictions (high risk) that were correct, calculated as TP divided by the sum of TP and FP. It represents the quality of the model's positive predictions.
+
+Negative Predictive Value: 0.8963 - This metric measures the proportion of negative predictions (low risk) that were correct, calculated as TN divided by the sum of TN and FN. It represents the quality of the model's negative predictions.
+
+```{r}
+my_confusion_matrix(matrix_table)
+```
+True Positive (TP): The model correctly predicted 334 instances as "low risk."
+
+True Negative (TN): The model correctly predicted 216 instances as "high risk."
+
+False Positive (FP): The model incorrectly predicted 32 instances as "low risk" when they were actually "high risk" (Type 1 Error).
+
+False Negative (FN): The model incorrectly predicted 25 instances as "high risk" when they were actually "low risk" (Type 2 Error).
+
+Accuracy: The accuracy of the model, which measures the overall correct prediction rate, is calculated as (TP + TN) / (TP + TN + FP + FN). In this case, the accuracy is 0.9061 or 90.61%.
+
+Sensitivity (Recall, Hit Rate, True Positive Rate): This measures the proportion of actual positives that the model correctly identified. It is calculated as TP / (TP + FN), which in this case is 0.9304 or 93.04%. It indicates the model's ability to identify "low risk" cases correctly.
+
+Specificity (Selectivity, True Negative Rate): This measures the proportion of actual negatives that the model correctly identified. It is calculated as TN / (TN + FP), which in this case is 0.8710 or 87.10%. It represents the model's ability to identify "high risk" cases correctly.
+
+These performance metrics provide insights into the model's effectiveness in predicting the risk level. A high accuracy, sensitivity, and specificity values indicate that the model has good predictive performance.
+
+
+### TEST THE PREDICTIVE POWER OF OUR MODEL ON THE TESTING DATA
+```{r}
+predict_testing <- predict(log_reg_model, newdata = test_data, positive = "highrisk")
+summary(predict_testing)
+```
+
+
+```{r}
+matrix_table_t <- table(predict_testing > 0.5, test_data$RiskLevel)
+matrix_table_t
+```
+The row labeled "FALSE" represents the observations that were classified as "not high risk" by the model, and the column labeled "high risk" shows that 73 observations were classified as "high risk" by the model.
+The same row labeled "FALSE" and the column labeled "low risk" indicates that 8 observations were classified as "low risk" by the model.
+The row labeled "TRUE" represents the observations that were classified as "high risk" by the model, and the column labeled "high risk" shows that 9 observations were correctly classified as "high risk" by the model.
+The same row labeled "TRUE" and the column labeled "low risk" indicates that 111 observations were correctly classified as "low risk" by the model.
+These numbers provide information about the performance of the model in terms of its ability to correctly classify observations into "high risk" and "low risk" categories
+
+```{r}
+my_confusion_matrix(matrix_table_t)
+```
+True Positive (TP): 111 - This represents the number of positive instances (high risk) correctly identified by the model.
+
+True Negative (TN): 73 - This represents the number of negative instances (low risk) correctly identified by the model.
+
+False Positive (FP): 9 - This represents the number of negative instances (low risk) incorrectly classified as positive (high risk) by the model (Type 1 Error).
+
+False Negative (FN): 8 - This represents the number of positive instances (high risk) incorrectly classified as negative (low risk) by the model (Type 2 Error).
+
+Accuracy: 0.9154 - This metric indicates the overall correctness of the model's predictions, calculated as (TP + TN) divided by the total number of instances (TP + TN + FP + FN).
+
+Sensitivity/Recall/Hit Rate/True Positive Rate: 0.9328 - This metric measures the model's ability to correctly identify positive instances (high risk), calculated as TP divided by the sum of TP and FN. It represents the proportion of actual positive instances that were correctly identified by the model.
+
+Specificity/Selectivity/True Negative Rate: 0.8902 - This metric measures the model's ability to correctly identify negative instances (low risk), calculated as TN divided by the sum of TN and FP. It represents the proportion of actual negative instances that were correctly identified by the model.
+
+Precision/Positive Predictive Value: 0.9250 - This metric measures the proportion of positive predictions (high risk) that were correct, calculated as TP divided by the sum of TP and FP. It represents the quality of the model's positive predictions.
+
+Negative Predictive Value: 0.9012 - This metric measures the proportion of negative predictions (low risk) that were correct, calculated as TN divided by the sum of TN and FN. It represents the quality of the model's negative predictions.
+
+#### CONLUSION
+Overall, the model demonstrates strong performance in terms of accuracy, sensitivity, specificity, precision, and negative predictive value. This shows that the fit and is good for predicting the maternal health risk of patients. It is important to consider additional factors, such as the cost of false positives and false negatives, as well as the potential consequences of misclassifications.
+
+```{r}
+```
+
+
+```{r}
+```
+
